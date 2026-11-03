@@ -1,0 +1,41 @@
+name: Atualizar dados do painel
+
+on:
+  schedule:
+    # Todo dia às 06:00 (horário de Brasília) = 09:00 UTC
+    - cron: "0 9 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Buscar dados no Apps Script
+        run: |
+          curl -sSL --retry 3 --max-time 120 \
+            "https://script.google.com/macros/s/AKfycbyY0HeNHld2QyxB4ykLGjqO1AQOgd3wTKQCwz_Nm-2uDn1Hk-ffdCj_FrHD_OQ0G0veNQ/exec?format=json" \
+            -o novo.json
+          python3 - <<'PY'
+          import json, datetime, sys
+          with open("novo.json", encoding="utf-8") as f:
+              d = json.load(f)
+          if "error" in d or "metrics" not in d:
+              print("Resposta sem dados validos:", str(d)[:300])
+              sys.exit(1)
+          br = datetime.timezone(datetime.timedelta(hours=-3))
+          d["atualizadoEm"] = datetime.datetime.now(br).isoformat(timespec="minutes")
+          with open("dados.json", "w", encoding="utf-8") as f:
+              json.dump(d, f, ensure_ascii=False)
+          print("Total de oportunidades:", d["metrics"].get("total"))
+          PY
+          rm -f novo.json
+
+      - name: Salvar no repositório
+        run: |
+          git config user.name "Atualizacao
