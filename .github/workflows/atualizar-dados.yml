@@ -2,7 +2,6 @@ name: Atualizar dados do painel
 
 on:
   schedule:
-    # Todo dia às 06:00 (horário de Brasília) = 09:00 UTC
     - cron: "0 9 * * *"
   workflow_dispatch: {}
 
@@ -13,14 +12,12 @@ jobs:
   atualizar:
     runs-on: ubuntu-latest
     steps:
-      - name: Baixar o repositório
+      - name: Baixar o repositorio
         uses: actions/checkout@v4
 
       - name: Buscar dados no Apps Script
         run: |
-          curl -sSL --retry 3 --max-time 120 \
-            "https://script.google.com/macros/s/AKfycbyY0HeNHld2QyxB4ykLGjqO1AQOgd3wTKQCwz_Nm-2uDn1Hk-ffdCj_FrHD_OQ0G0veNQ/exec?format=json" \
-            -o novo.json
+          curl -sSL --retry 3 --max-time 120 "https://script.google.com/macros/s/AKfycbyY0HeNHld2QyxB4ykLGjqO1AQOgd3wTKQCwz_Nm-2uDn1Hk-ffdCj_FrHD_OQ0G0veNQ/exec?format=json" -o novo.json
           python3 - <<'PY'
           import json, datetime, sys
           with open("novo.json", encoding="utf-8") as f:
@@ -36,6 +33,14 @@ jobs:
           PY
           rm -f novo.json
 
-      - name: Salvar no repositório
+      - name: Salvar no repositorio
         run: |
-          git config user.name "Atualizacao
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add dados.json
+          if git diff --cached --quiet; then
+            echo Sem mudancas nos dados
+          else
+            git commit -m atualiza-dados-do-painel
+            git push
+          fi
