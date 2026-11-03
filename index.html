@@ -1816,7 +1816,7 @@ body.resumo .kpi-strip{display:flex}
     </div>
 
     <div class="side-foot">
-      Dados atualizados automaticamente a partir da planilha de conexões, a cada abertura do painel.
+      Dados atualizados diariamente a partir da planilha de conexões.
     </div>
 
     </div>
@@ -1835,7 +1835,7 @@ body.resumo .kpi-strip{display:flex}
           <div class="header-title-main">Painel de Geração de Negócios</div>
           <div class="header-title-sub" id="header-sub">Carregando...</div>
         </div>
-        <span class="topbar-chip">Dados ao vivo</span>
+        <span class="topbar-chip">Atualização diária</span>
       </div>
       <div class="kpi-strip" id="kpi-strip" aria-label="Resumo dos indicadores">
         <button type="button" class="ks-item ks-total" data-goto="sec-visao"><span class="ks-v" data-src="kpi-total">-</span><span class="ks-l">Oportunidades</span></button>
@@ -1990,11 +1990,24 @@ body.resumo .kpi-strip{display:flex}
 
 <script>
 /* =========================================================
-   CONEXÃO COM A PLANILHA (versão GitHub)
-   A página busca os dados no Apps Script a cada abertura.
-   Se o endereço da implantação mudar, troque apenas a linha abaixo.
+   CONEXÃO COM A PLANILHA (versão GitHub, atualização diária)
+   A página lê o arquivo dados.json deste repositório, que uma
+   rotina automática do GitHub (Actions) atualiza todo dia a partir
+   do Apps Script. Assim o painel abre mesmo em redes que bloqueiam
+   o Google. Se dados.json não estiver disponível, tenta o Apps Script.
    ========================================================= */
+var DADOS_URL = 'dados.json';
 var API_URL = 'https://script.google.com/macros/s/AKfycbyY0HeNHld2QyxB4ykLGjqO1AQOgd3wTKQCwz_Nm-2uDn1Hk-ffdCj_FrHD_OQ0G0veNQ/exec';
+
+function teiaMarcarAtualizacao_(iso){
+  var el = document.getElementById('header-sub');
+  if(!el || !iso) return;
+  var d = new Date(iso);
+  if(isNaN(d)) return;
+  var meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  var hh=('0'+d.getHours()).slice(-2), mm=('0'+d.getMinutes()).slice(-2);
+  el.innerHTML='Dados atualizados em <strong>'+d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear()+'</strong> às '+hh+'h'+mm+' · Equipe Ecossistema';
+}
 
 window.google = { script: { run: {
   _ok: null, _erro: null,
@@ -2002,14 +2015,20 @@ window.google = { script: { run: {
   withFailureHandler: function(fn){ this._erro = fn; return this; },
   getDashboardData: function(){
     var ok = this._ok, erro = this._erro;
-    fetch(API_URL + '?format=json&t=' + Date.now())
-      .then(function(r){
-        if(!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function(d){ ok && ok(d); })
+    function entregar(d){
+      teiaMarcarAtualizacao_(d && d.atualizadoEm);
+      ok && ok(d);
+    }
+    fetch(DADOS_URL + '?t=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){ if(!d || !d.metrics) throw new Error('sem dados'); entregar(d); })
       .catch(function(){
-        erro && erro('não foi possível carregar os dados da planilha. Verifique se a implantação do Apps Script está com acesso "Qualquer pessoa" e se o endereço em API_URL está correto.');
+        fetch(API_URL + '?format=json&t=' + Date.now())
+          .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .then(function(d){ ok && ok(d); })
+          .catch(function(){
+            erro && erro('não foi possível carregar os dados do painel. Recarregue a página; se o erro continuar, avise a equipe de Ecossistema.');
+          });
       });
   }
 }}};
